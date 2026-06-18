@@ -1,4 +1,19 @@
-import { ServerMessage, ClientMessage, GameState, Player } from "@agar-vibe/shared";
+import {
+  GameState,
+  Player,
+  Food,
+  PACKET_TYPES,
+  COLORS,
+  serializeJoin,
+  serializeInput,
+  deserializeWelcome,
+  deserializePlayerRegistry,
+  deserializePlayerRemove,
+  deserializeGameTick,
+  deserializeInitialFood,
+  deserializeFoodSpawn,
+  deserializeFoodEaten
+} from "@agar-vibe/shared";
 import { CanvasRenderer } from "./render.js";
 import { InputManager } from "./input.js";
 import { StateInterpolation } from "./interpolation.js";
@@ -6,10 +21,19 @@ import { StateInterpolation } from "./interpolation.js";
 const wsUrl = `ws://${window.location.hostname}:8080`;
 console.log("Connecting to WebSocket:", wsUrl);
 const ws = new WebSocket(wsUrl);
+ws.binaryType = "arraybuffer";
 
 const renderer = new CanvasRenderer("game-canvas");
 const inputManager = new InputManager();
 const interpolation = new StateInterpolation();
+
+interface RegistryEntry {
+  name: string;
+  color: string;
+}
+
+const playerRegistry: Map<string, RegistryEntry> = new Map();
+const activeFoods: Map<string, Food> = new Map();
 
 let localPlayerId: string | null = null;
 let isPlaying = false;
@@ -28,17 +52,99 @@ ws.addEventListener("open", () => {
 
 ws.addEventListener("message", (event) => {
   try {
-    const data = JSON.parse(event.data) as ServerMessage;
+    const arrayBuffer = event.data as ArrayBuffer;
+    const view = new DataView(arrayBuffer);
+    const packetType = view.getUint8(0);
 
-    switch (data.type) {
-      case "welcome":
-        localPlayerId = data.playerId;
+    switch (packetType) {
+      case PACKET_TYPES.WELCOME: {
+        const id = deserializeWelcome(view);
+        localPlayerId = id.toString();
         console.log("Joined session with playerId:", localPlayerId);
         break;
-      case "tick":
-        interpolation.addTick(data.state);
-        latestState = data.state;
+      }
+      case PACKET_TYPES.PLAYER_REGISTRY: {
+        const entries = deserializePlayerRegistry(view);
+        for (const entry of entries) {
+          playerRegistry.set(entry.id.toString(), {
+            name: entry.name,
+            color: COLORS[entry.colorIndex] || "#ffffff"
+          });
+        }
         break;
+      }
+      case PACKET_TYPES.PLAYER_REMOVE: {
+        const id = deserializePlayerRemove(view);
+        playerRegistry.delete(id.toString());
+        break;
+      }
+      case PACKET_TYPES.INITIAL_FOOD: {
+        const foods = deserializeInitialFood(view);
+        activeFoods.clear();
+        for (const f of foods) {
+          const foodId = f.id.toString();
+          activeFoods.set(foodId, {
+            id: foodId,
+            x: f.x,
+            y: f.y,
+            radius: 6,
+            color: COLORS[f.colorIndex] || "#ffffff"
+          });
+        }
+        break;
+      }
+      case PACKET_TYPES.FOOD_SPAWN: {
+        const f = deserializeFoodSpawn(view);
+        const foodId = f.id.toString();
+        activeFoods.set(foodId, {
+          id: foodId,
+          x: f.x,
+          y: f.y,
+          radius: 6,
+          color: COLORS[f.colorIndex] || "#ffffff"
+        });
+        break;
+      }
+      case PACKET_TYPES.FOOD_EATEN: {
+        const { foodId } = deserializeFoodEaten(view);
+        activeFoods.delete(foodId.toString());
+        break;
+      }
+      case PACKET_TYPES.GAME_TICK: {
+        const tick = deserializeGameTick(view);
+        const players = tick.players;
+
+        const mappedPlayers = players.map((p) => {
+          const pId = p.id.toString();
+          const reg = playerRegistry.get(pId);
+          return {
+            id: pId,
+            name: reg ? reg.name : "Guest",
+            color: reg ? reg.color : "#ffffff",
+            cells: [
+              {
+                id: `${pId}-cell-0`,
+                x: p.x,
+                y: p.y,
+                radius: p.radius,
+                mass: p.score
+              }
+            ],
+            score: p.score
+          };
+        });
+
+        const tickState: GameState = {
+          width: 4000,
+          height: 4000,
+          players: mappedPlayers,
+          food: Array.from(activeFoods.values())
+        };
+
+        interpolation.addTick(tickState);
+        latestState = tickState;
+        break;
+      }
     }
   } catch (err) {
     console.error("Error parsing message from server:", err);
@@ -54,12 +160,7 @@ function joinGame() {
   if (ws.readyState !== WebSocket.OPEN) return;
 
   const name = nicknameInput.value.trim() || "Guest";
-  const joinPacket: ClientMessage = {
-    type: "join",
-    name
-  };
-
-  ws.send(JSON.stringify(joinPacket));
+  ws.send(serializeJoin(name));
 
   isPlaying = true;
   hasSpawned = false;
@@ -93,6 +194,7 @@ nicknameInput.addEventListener("keypress", (e) => {
 let lastInputSentTime = 0;
 let lastAngle = 0;
 let lastSpeed = 0;
+let clientSeq = 0;
 
 function gameTick() {
   if (isPlaying && ws.readyState === WebSocket.OPEN) {
@@ -103,12 +205,8 @@ function gameTick() {
     const speedDiff = Math.abs(input.speed - lastSpeed);
 
     if (now - lastInputSentTime > 33 || angleDiff > 0.05 || speedDiff > 0.05) {
-      const inputPacket: ClientMessage = {
-        type: "input",
-        angle: input.angle,
-        speed: input.speed
-      };
-      ws.send(JSON.stringify(inputPacket));
+      clientSeq++;
+      ws.send(serializeInput(clientSeq, input.angle, input.speed));
 
       lastAngle = input.angle;
       lastSpeed = input.speed;
