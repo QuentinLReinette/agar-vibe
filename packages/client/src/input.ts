@@ -9,6 +9,7 @@ export class InputManager {
 
   public start(): void {
     this.isActive = true;
+    this.speed = 1;
   }
 
   public stop(): void {
@@ -30,10 +31,5 @@ export class InputManager {
     const dy = e.clientY - centerY;
 
     this.angle = Math.atan2(dy, dx);
-
-    // Speed factor based on distance from screen center (max speed reached at 150px)
-    const distance = Math.sqrt(dx * dx + dy * dy);
-    const maxRadius = 150;
-    this.speed = Math.min(1, distance / maxRadius);
   }
 }

@@ -23,7 +23,7 @@ export class GameEngine {
   private food: Food[] = [];
 
   private readonly maxFood = 400;
-  private readonly baseSpeed = 160;
+  private readonly baseSpeed = 300;
 
   // Track inputs for each player: { id: { angle, speed } }
   private playerInputs: Map<string, { angle: number; speed: number }> = new Map();
