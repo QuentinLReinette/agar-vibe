@@ -3,127 +3,33 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Agar-Vibe</title>
-    <style>
-      body {
-        margin: 0;
-        overflow: hidden;
-        background-color: #08090d;
-        color: #e2e8f0;
-        font-family:
-          "Inter",
-          system-ui,
-          -apple-system,
-          sans-serif;
-        user-select: none;
-      }
-      #game-canvas {
-        display: block;
-        width: 100vw;
-        height: 100vh;
-      }
-      #lobby {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background: rgba(15, 23, 42, 0.85);
-        backdrop-filter: blur(12px);
-        border: 1px solid rgba(102, 252, 241, 0.2);
-        padding: 40px;
-        border-radius: 16px;
-        box-shadow:
-          0 10px 25px -5px rgba(0, 0, 0, 0.5),
-          0 0 20px rgba(102, 252, 241, 0.1);
-        text-align: center;
-        width: 320px;
-        transition: opacity 0.3s ease;
-      }
-      #lobby h1 {
-        margin-top: 0;
-        font-size: 2.2rem;
-        font-weight: 800;
-        letter-spacing: -0.05em;
-        background: linear-gradient(90deg, #66fcf1, #45f3ff);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        margin-bottom: 24px;
-      }
-      #nickname-input {
-        width: 100%;
-        box-sizing: border-box;
-        padding: 14px 20px;
-        background: rgba(30, 41, 59, 0.5);
-        border: 1px solid rgba(148, 163, 184, 0.3);
-        border-radius: 8px;
-        color: #fff;
-        font-size: 1rem;
-        outline: none;
-        margin-bottom: 20px;
-        transition: border-color 0.2s;
-      }
-      #nickname-input:focus {
-        border-color: #66fcf1;
-      }
-      #play-button {
-        width: 100%;
-        padding: 14px;
-        background: linear-gradient(90deg, #00f2fe, #4facfe);
-        border: none;
-        border-radius: 8px;
-        color: #0b0c10;
-        font-weight: 700;
-        font-size: 1rem;
-        cursor: pointer;
-        outline: none;
-        box-shadow: 0 4px 12px rgba(79, 172, 254, 0.3);
-        transition:
-          transform 0.1s,
-          box-shadow 0.2s;
-      }
-      #play-button:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 6px 16px rgba(79, 172, 254, 0.4);
-      }
-      #play-button:active {
-        transform: translateY(1px);
-      }
-      #hud {
-        position: absolute;
-        bottom: 24px;
-        left: 24px;
-        background: rgba(15, 23, 42, 0.75);
-        backdrop-filter: blur(8px);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        padding: 12px 20px;
-        border-radius: 10px;
-        font-size: 1.1rem;
-        font-weight: 600;
-        pointer-events: none;
-        display: none;
-      }
-      #hud span {
-        color: #66fcf1;
-      }
-    </style>
+    <title>Agar-Vibe | Real-Time Multiplayer .io Game</title>
+    <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
+    <!-- Game Viewport Canvas -->
     <canvas id="game-canvas"></canvas>
 
-    <div id="lobby">
-      <h1>AGAR.VIBE</h1>
-      <input
-        type="text"
-        id="nickname-input"
-        placeholder="Enter Nickname"
-        maxlength="15"
-        autofocus
-      />
-      <button id="play-button">Play Game</button>
+    <!-- Interactive UI Layer -->
+    <div class="ui-overlay">
+      <!-- Lobby Molecule Card -->
+      <div id="lobby" class="lobby-card">
+        <h1>Agar.Vibe</h1>
+        <input
+          type="text"
+          id="nickname-input"
+          placeholder="ENTER NICKNAME"
+          maxlength="15"
+          autofocus
+        />
+        <button id="play-button">Play Game</button>
+      </div>
+
+      <!-- Score HUD Molecule Badge -->
+      <div id="hud" class="score-hud">Score: <span id="score-val">0</span></div>
     </div>
 
-    <div id="hud">Score: <span id="score-val">0</span></div>
-
+    <!-- Main Entry Module -->
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
