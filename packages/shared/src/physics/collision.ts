@@ -1,10 +1,17 @@
 import { Circle, AABB } from "./shapes.js";
 
-export function checkCircleCircle(c1: Circle, c2: Circle): boolean {
-  const dx = c1.x - c2.x;
-  const dy = c1.y - c2.y;
+export function checkCircleCircle(
+  x1: number,
+  y1: number,
+  r1: number,
+  x2: number,
+  y2: number,
+  r2: number
+): boolean {
+  const dx = x1 - x2;
+  const dy = y1 - y2;
   const distanceSquared = dx * dx + dy * dy;
-  const radiusSum = c1.radius + c2.radius;
+  const radiusSum = r1 + r2;
   return distanceSquared <= radiusSum * radiusSum;
 }
 

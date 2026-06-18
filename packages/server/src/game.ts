@@ -1,4 +1,4 @@
-import { Circle, AABB, checkCircleCircle } from "@agar-vibe/shared";
+import { checkCircleCircle, SpatialGrid } from "@agar-vibe/shared";
 import { Player, PlayerCell, Food, GameState } from "@agar-vibe/shared";
 
 const COLORS = [
@@ -17,10 +17,10 @@ const COLORS = [
 export class GameEngine {
   public readonly width = 4000;
   public readonly height = 4000;
-  private readonly worldBox: AABB;
 
   private players: Map<string, Player> = new Map();
   private food: Food[] = [];
+  private foodGrid: SpatialGrid<Food> = new SpatialGrid<Food>(200);
 
   private readonly maxFood = 400;
   private readonly baseSpeed = 300;
@@ -29,7 +29,6 @@ export class GameEngine {
   private playerInputs: Map<string, { angle: number; speed: number }> = new Map();
 
   constructor() {
-    this.worldBox = new AABB(0, 0, this.width, this.height);
     this.spawnInitialFood();
   }
 
@@ -101,7 +100,9 @@ export class GameEngine {
 
   private spawnInitialFood(): void {
     for (let i = 0; i < this.maxFood; i++) {
-      this.food.push(this.createRandomFood());
+      const item = this.createRandomFood();
+      this.food.push(item);
+      this.foodGrid.insert(item);
     }
   }
 
@@ -122,7 +123,9 @@ export class GameEngine {
 
   private maintainFoodDensity(): void {
     while (this.food.length < this.maxFood) {
-      this.food.push(this.createRandomFood());
+      const item = this.createRandomFood();
+      this.food.push(item);
+      this.foodGrid.insert(item);
     }
   }
 
@@ -150,20 +153,29 @@ export class GameEngine {
     // 1. Cell vs Food
     for (const player of this.players.values()) {
       for (const cell of player.cells) {
-        const cellCircle = new Circle(cell.x, cell.y, cell.radius);
+        const minX = cell.x - cell.radius;
+        const maxX = cell.x + cell.radius;
+        const minY = cell.y - cell.radius;
+        const maxY = cell.y + cell.radius;
 
-        // Filter out food elements eaten by this cell
-        this.food = this.food.filter((foodItem) => {
-          const foodCircle = new Circle(foodItem.x, foodItem.y, foodItem.radius);
-          if (checkCircleCircle(cellCircle, foodCircle)) {
-            // Eat food: increase cell mass and score
-            cell.mass += 1;
-            player.score = this.calculateTotalScore(player);
-            cell.radius = this.calculateRadius(cell.mass);
-            return false; // remove from food list
+        const candidates = this.foodGrid.query(minX, minY, maxX, maxY);
+        for (const foodItem of candidates) {
+          if (
+            checkCircleCircle(cell.x, cell.y, cell.radius, foodItem.x, foodItem.y, foodItem.radius)
+          ) {
+            if (this.foodGrid.remove(foodItem)) {
+              // Eat food: increase cell mass and score
+              cell.mass += 1;
+              player.score = this.calculateTotalScore(player);
+              cell.radius = this.calculateRadius(cell.mass);
+              // Remove from food list
+              const idx = this.food.findIndex((f) => f.id === foodItem.id);
+              if (idx !== -1) {
+                this.food.splice(idx, 1);
+              }
+            }
           }
-          return true; // keep
-        });
+        }
       }
     }
 

@@ -25,19 +25,19 @@ describe("Collision System", () => {
     test("overlapping circles", () => {
       const c1 = new Circle(0, 0, 5);
       const c2 = new Circle(3, 4, 5);
-      expect(checkCircleCircle(c1, c2)).toBe(true);
+      expect(checkCircleCircle(c1.x, c1.y, c1.radius, c2.x, c2.y, c2.radius)).toBe(true);
     });
 
     test("touching circles", () => {
       const c1 = new Circle(0, 0, 3);
       const c2 = new Circle(5, 0, 2);
-      expect(checkCircleCircle(c1, c2)).toBe(true);
+      expect(checkCircleCircle(c1.x, c1.y, c1.radius, c2.x, c2.y, c2.radius)).toBe(true);
     });
 
     test("separated circles", () => {
       const c1 = new Circle(0, 0, 3);
       const c2 = new Circle(6, 0, 2);
-      expect(checkCircleCircle(c1, c2)).toBe(false);
+      expect(checkCircleCircle(c1.x, c1.y, c1.radius, c2.x, c2.y, c2.radius)).toBe(false);
     });
   });
 

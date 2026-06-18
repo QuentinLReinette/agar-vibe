@@ -12,9 +12,19 @@ console.log(
   `Server starting on port ${port}, world size: ${gameEngine.width}x${gameEngine.height}`
 );
 
+interface ExtWebSocket extends WebSocket {
+  isAlive?: boolean;
+}
+
 wss.on("connection", (ws) => {
   const playerId = `p-${Math.random().toString(36).substring(2, 9)}`;
   clients.set(playerId, ws);
+
+  const extWs = ws as ExtWebSocket;
+  extWs.isAlive = true;
+  extWs.on("pong", () => {
+    extWs.isAlive = true;
+  });
 
   console.log(`Client connected: ${playerId}`);
 
@@ -95,6 +105,22 @@ function broadcastState() {
     }
   }
 }
+
+const interval = setInterval(() => {
+  wss.clients.forEach((ws) => {
+    const extWs = ws as ExtWebSocket;
+    if (extWs.isAlive === false) {
+      console.log("Terminating unresponsive connection");
+      return extWs.terminate();
+    }
+    extWs.isAlive = false;
+    extWs.ping();
+  });
+}, 30000);
+
+wss.on("close", () => {
+  clearInterval(interval);
+});
 
 // Start game loop
 gameLoop();
