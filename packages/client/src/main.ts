@@ -276,7 +276,11 @@ function gameTick() {
 
   const state = interpolation.getInterpolatedState();
   if (state) {
-    renderer.render(state, localPlayerId);
+    if (isPlaying && hasSpawned) {
+      renderer.render(state, localPlayerId, predictedX, predictedY, predictedRadius);
+    } else {
+      renderer.render(state, localPlayerId);
+    }
 
     if (isPlaying && localPlayerId) {
       const player = state.players.find((p) => p.id === localPlayerId);

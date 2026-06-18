@@ -16,7 +16,13 @@ export class CanvasRenderer {
     this.canvas.height = window.innerHeight;
   }
 
-  public render(state: GameState, localPlayerId: string | null): void {
+  public render(
+    state: GameState,
+    localPlayerId: string | null,
+    predictedX?: number,
+    predictedY?: number,
+    predictedRadius?: number
+  ): void {
     const width = this.canvas.width;
     const height = this.canvas.height;
 
@@ -28,14 +34,19 @@ export class CanvasRenderer {
 
     const localPlayer = localPlayerId ? state.players.find((p) => p.id === localPlayerId) : null;
     if (localPlayer && localPlayer.cells.length > 0) {
-      let sumX = 0;
-      let sumY = 0;
-      for (const cell of localPlayer.cells) {
-        sumX += cell.x;
-        sumY += cell.y;
+      if (predictedX !== undefined && predictedY !== undefined) {
+        camX = predictedX;
+        camY = predictedY;
+      } else {
+        let sumX = 0;
+        let sumY = 0;
+        for (const cell of localPlayer.cells) {
+          sumX += cell.x;
+          sumY += cell.y;
+        }
+        camX = sumX / localPlayer.cells.length;
+        camY = sumY / localPlayer.cells.length;
       }
-      camX = sumX / localPlayer.cells.length;
-      camY = sumY / localPlayer.cells.length;
     }
 
     this.ctx.save();
@@ -64,7 +75,22 @@ export class CanvasRenderer {
     for (const player of sortedPlayers) {
       const isLocal = player.id === localPlayerId;
       for (const cell of player.cells) {
-        this.drawCell(cell, player.name, player.color, isLocal);
+        if (
+          isLocal &&
+          predictedX !== undefined &&
+          predictedY !== undefined &&
+          predictedRadius !== undefined
+        ) {
+          const predCell = {
+            ...cell,
+            x: predictedX,
+            y: predictedY,
+            radius: predictedRadius
+          };
+          this.drawCell(predCell, player.name, player.color, isLocal);
+        } else {
+          this.drawCell(cell, player.name, player.color, isLocal);
+        }
       }
     }
 
