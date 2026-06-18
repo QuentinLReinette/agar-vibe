@@ -7,6 +7,13 @@ export class CanvasRenderer {
   constructor(canvasId: string) {
     this.canvas = document.getElementById(canvasId) as HTMLCanvasElement;
     this.ctx = this.canvas.getContext("2d")!;
+    this.resize();
+    window.addEventListener("resize", () => this.resize());
+  }
+
+  private resize(): void {
+    this.canvas.width = window.innerWidth;
+    this.canvas.height = window.innerHeight;
   }
 
   public render(state: GameState, localPlayerId: string | null): void {

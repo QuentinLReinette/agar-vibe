@@ -1,4 +1,4 @@
-import { ServerMessage, ClientMessage } from "@agar-vibe/shared";
+import { ServerMessage, ClientMessage, GameState, Player } from "@agar-vibe/shared";
 import { CanvasRenderer } from "./render.js";
 import { InputManager } from "./input.js";
 import { StateInterpolation } from "./interpolation.js";
@@ -13,6 +13,8 @@ const interpolation = new StateInterpolation();
 
 let localPlayerId: string | null = null;
 let isPlaying = false;
+let hasSpawned = false;
+let latestState: GameState | null = null;
 
 const lobby = document.getElementById("lobby")!;
 const nicknameInput = document.getElementById("nickname-input")! as HTMLInputElement;
@@ -35,6 +37,7 @@ ws.addEventListener("message", (event) => {
         break;
       case "tick":
         interpolation.addTick(data.state);
+        latestState = data.state;
         break;
     }
   } catch (err) {
@@ -59,10 +62,13 @@ function joinGame() {
   ws.send(JSON.stringify(joinPacket));
 
   isPlaying = true;
+  hasSpawned = false;
   lobby.style.opacity = "0";
   setTimeout(() => {
-    lobby.style.display = "none";
-    hud.style.display = "block";
+    if (isPlaying) {
+      lobby.style.display = "none";
+      hud.style.display = "block";
+    }
   }, 300);
 
   inputManager.start();
@@ -118,13 +124,32 @@ function gameTick() {
       const player = state.players.find((p) => p.id === localPlayerId);
       if (player) {
         scoreVal.innerText = player.score.toString();
-      } else {
-        console.log("Game over! Died.");
-        showLobby();
       }
     }
   } else {
     drawLoadingScreen();
+  }
+
+  // Death detection checks against raw latestState (prevents LERP window timing bugs)
+  if (isPlaying && localPlayerId && latestState) {
+    const playerExists = latestState.players.some((p: Player) => p.id === localPlayerId);
+    if (playerExists && !hasSpawned) {
+      console.log("[DEBUG] Player found in latestState. Setting hasSpawned = true.", {
+        localPlayerId,
+        players: latestState.players.map((p: Player) => p.id)
+      });
+      hasSpawned = true;
+    }
+
+    if (hasSpawned && !playerExists) {
+      console.log("[DEBUG] Game over! Died because playerExists is false but hasSpawned is true.", {
+        localPlayerId,
+        hasSpawned,
+        playerExists,
+        players: latestState.players.map((p: Player) => p.id)
+      });
+      showLobby();
+    }
   }
 
   requestAnimationFrame(gameTick);
