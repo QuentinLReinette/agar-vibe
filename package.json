@@ -10,7 +10,9 @@
   "scripts": {
     "build": "tsc -b",
     "lint": "eslint \"packages/**/*.{ts,js}\"",
-    "format": "prettier --write \"packages/**/*.{ts,js,css,html}\""
+    "format": "prettier --write \"packages/**/*.{ts,js,css,html}\"",
+    "test": "npm run test --workspaces --if-present",
+    "check": "npm run format && npm run lint && npm test && npm run build"
   },
   "devDependencies": {
     "@eslint/js": "^9.5.0",
