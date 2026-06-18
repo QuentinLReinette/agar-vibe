@@ -40,6 +40,18 @@ let isPlaying = false;
 let hasSpawned = false;
 let latestState: GameState | null = null;
 
+interface PendingInput {
+  seq: number;
+  angle: number;
+  speed: number;
+  dt: number;
+}
+const pendingInputs: PendingInput[] = [];
+let predictedX = 0;
+let predictedY = 0;
+let predictedRadius = 10;
+let predictedMass = 10;
+
 const lobby = document.getElementById("lobby")!;
 const nicknameInput = document.getElementById("nickname-input")! as HTMLInputElement;
 const playButton = document.getElementById("play-button")!;
@@ -143,6 +155,29 @@ ws.addEventListener("message", (event) => {
 
         interpolation.addTick(tickState);
         latestState = tickState;
+
+        const serverLocalPlayer = players.find((p) => p.id === Number(localPlayerId));
+        if (serverLocalPlayer && hasSpawned) {
+          predictedX = serverLocalPlayer.x;
+          predictedY = serverLocalPlayer.y;
+          predictedRadius = serverLocalPlayer.radius;
+          predictedMass = serverLocalPlayer.score;
+
+          while (pendingInputs.length > 0 && pendingInputs[0].seq <= tick.lastProcessedSeq) {
+            pendingInputs.shift();
+          }
+
+          for (const pending of pendingInputs) {
+            const speedModifier = 300 / Math.sqrt(predictedMass);
+            const velocity = speedModifier * pending.speed;
+
+            predictedX += Math.cos(pending.angle) * velocity * pending.dt;
+            predictedY += Math.sin(pending.angle) * velocity * pending.dt;
+
+            predictedX = Math.max(predictedRadius, Math.min(4000 - predictedRadius, predictedX));
+            predictedY = Math.max(predictedRadius, Math.min(4000 - predictedRadius, predictedY));
+          }
+        }
         break;
       }
     }
@@ -184,6 +219,8 @@ function showLobby() {
   void lobby.offsetHeight;
   lobby.style.opacity = "1";
   nicknameInput.focus();
+  pendingInputs.length = 0;
+  clientSeq = 0;
 }
 
 playButton.addEventListener("click", joinGame);
@@ -195,11 +232,16 @@ let lastInputSentTime = 0;
 let lastAngle = 0;
 let lastSpeed = 0;
 let clientSeq = 0;
+let lastFrameTime = performance.now();
 
 function gameTick() {
+  const now = performance.now();
+  let dt = (now - lastFrameTime) / 1000;
+  lastFrameTime = now;
+  dt = Math.min(dt, 0.1);
+
   if (isPlaying && ws.readyState === WebSocket.OPEN) {
     const input = inputManager.getInput();
-    const now = performance.now();
 
     const angleDiff = Math.abs(input.angle - lastAngle);
     const speedDiff = Math.abs(input.speed - lastSpeed);
@@ -211,6 +253,24 @@ function gameTick() {
       lastAngle = input.angle;
       lastSpeed = input.speed;
       lastInputSentTime = now;
+    }
+
+    if (hasSpawned) {
+      const speedModifier = 300 / Math.sqrt(predictedMass);
+      const velocity = speedModifier * input.speed;
+
+      predictedX += Math.cos(input.angle) * velocity * dt;
+      predictedY += Math.sin(input.angle) * velocity * dt;
+
+      predictedX = Math.max(predictedRadius, Math.min(4000 - predictedRadius, predictedX));
+      predictedY = Math.max(predictedRadius, Math.min(4000 - predictedRadius, predictedY));
+
+      pendingInputs.push({
+        seq: clientSeq,
+        angle: input.angle,
+        speed: input.speed,
+        dt
+      });
     }
   }
 
@@ -237,6 +297,14 @@ function gameTick() {
         players: latestState.players.map((p: Player) => p.id)
       });
       hasSpawned = true;
+
+      const localPlayer = latestState.players.find((p) => p.id === localPlayerId);
+      if (localPlayer && localPlayer.cells.length > 0) {
+        predictedX = localPlayer.cells[0].x;
+        predictedY = localPlayer.cells[0].y;
+        predictedRadius = localPlayer.cells[0].radius;
+        predictedMass = localPlayer.cells[0].mass;
+      }
     }
 
     if (hasSpawned && !playerExists) {
