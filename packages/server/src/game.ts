@@ -11,7 +11,7 @@ const COLORS = [
   "#ffeb3b", // yellow
   "#ff9800", // amber
   "#009688", // teal
-  "#673ab7"  // deep purple
+  "#673ab7" // deep purple
 ];
 
 export class GameEngine {
@@ -21,10 +21,10 @@ export class GameEngine {
 
   private players: Map<string, Player> = new Map();
   private food: Food[] = [];
-  
+
   private readonly maxFood = 400;
   private readonly baseSpeed = 160;
-  
+
   // Track inputs for each player: { id: { angle, speed } }
   private playerInputs: Map<string, { angle: number; speed: number }> = new Map();
 
@@ -35,11 +35,11 @@ export class GameEngine {
 
   public addPlayer(id: string, name: string): Player {
     const color = COLORS[Math.floor(Math.random() * COLORS.length)];
-    
+
     // Spawn at random position with safety padding
     const startX = 200 + Math.random() * (this.width - 400);
     const startY = 200 + Math.random() * (this.height - 400);
-    
+
     const initialMass = 10;
     const initialRadius = this.calculateRadius(initialMass);
 
@@ -151,9 +151,9 @@ export class GameEngine {
     for (const player of this.players.values()) {
       for (const cell of player.cells) {
         const cellCircle = new Circle(cell.x, cell.y, cell.radius);
-        
+
         // Filter out food elements eaten by this cell
-        this.food = this.food.filter(foodItem => {
+        this.food = this.food.filter((foodItem) => {
           const foodCircle = new Circle(foodItem.x, foodItem.y, foodItem.radius);
           if (checkCircleCircle(cellCircle, foodCircle)) {
             // Eat food: increase cell mass and score
@@ -175,13 +175,13 @@ export class GameEngine {
         for (const otherPlayer of allPlayers) {
           if (player.id === otherPlayer.id) continue;
 
-          otherPlayer.cells = otherPlayer.cells.filter(otherCell => {
+          otherPlayer.cells = otherPlayer.cells.filter((otherCell) => {
             // Distance check
             const dx = cell.x - otherCell.x;
             const dy = cell.y - otherCell.y;
             const dist = Math.sqrt(dx * dx + dy * dy);
 
-            // Eat condition: 
+            // Eat condition:
             // 1. Current cell is 10% larger than other cell in mass
             // 2. Center of smaller cell is within larger cell's circle (dist < radius)
             if (cell.mass > otherCell.mass * 1.1 && dist < cell.radius) {

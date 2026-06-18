@@ -8,7 +8,9 @@ const wss = new WebSocketServer({ port });
 const gameEngine = new GameEngine();
 const clients: Map<string, WebSocket> = new Map();
 
-console.log(`Server starting on port ${port}, world size: ${gameEngine.width}x${gameEngine.height}`);
+console.log(
+  `Server starting on port ${port}, world size: ${gameEngine.width}x${gameEngine.height}`
+);
 
 wss.on("connection", (ws) => {
   const playerId = `p-${Math.random().toString(36).substring(2, 9)}`;
@@ -28,7 +30,7 @@ wss.on("connection", (ws) => {
   ws.on("message", (rawMessage) => {
     try {
       const message = JSON.parse(rawMessage.toString()) as ClientMessage;
-      
+
       switch (message.type) {
         case "join":
           gameEngine.addPlayer(playerId, message.name);
