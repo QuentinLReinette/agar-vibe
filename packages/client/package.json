@@ -1,0 +1,17 @@
+{
+  "name": "@agar-vibe/client",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@agar-vibe/shared": "*"
+  },
+  "devDependencies": {
+    "vite": "^5.3.1"
+  }
+}

@@ -1,0 +1,8 @@
+.agents
+node_modules/
+dist/
+skills-lock.json
+.env
+AGENTS.md
+*.tsbuildinfo
+

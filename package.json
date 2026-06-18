@@ -1,0 +1,23 @@
+{
+  "name": "agar-vibe",
+  "private": true,
+  "type": "module",
+  "version": "1.0.0",
+  "description": "Multiplayer .io game",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "lint": "eslint \"packages/**/*.{ts,js}\"",
+    "format": "prettier --write \"packages/**/*.{ts,js,css,html}\""
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.5.0",
+    "eslint": "^9.5.0",
+    "prettier": "^3.3.2",
+    "tsx": "^4.15.6",
+    "typescript": "^5.4.5",
+    "typescript-eslint": "^8.0.0"
+  }
+}

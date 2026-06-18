@@ -1,0 +1,21 @@
+.git
+.gitignore
+.gitattributes
+.agents/
+.prettierrc
+eslint.config.js
+README.md
+AGENTS.MD
+
+# Ignore local dependency folders
+node_modules/
+packages/*/node_modules/
+
+# Ignore local build directories
+dist/
+packages/*/dist/
+
+# Ignore environment/logs
+.env
+.npm
+*.log

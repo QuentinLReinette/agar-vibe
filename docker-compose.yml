@@ -1,0 +1,33 @@
+services:
+  server:
+    build:
+      context: .
+      dockerfile: packages/server/Dockerfile
+      target: dev
+    ports:
+      - "8080:8080"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/packages/shared/node_modules
+      - /app/packages/server/node_modules
+      - /app/packages/client/node_modules
+    environment:
+      - PORT=8080
+      - NODE_ENV=development
+
+  client:
+    build:
+      context: .
+      dockerfile: packages/client/Dockerfile
+      target: dev
+    ports:
+      - "5173:5173"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/packages/shared/node_modules
+      - /app/packages/server/node_modules
+      - /app/packages/client/node_modules
+    environment:
+      - NODE_ENV=development
