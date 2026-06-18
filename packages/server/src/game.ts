@@ -21,6 +21,12 @@ export class GameEngine {
   private players: Map<string, Player> = new Map();
   private food: Food[] = [];
   private foodGrid: SpatialGrid<Food> = new SpatialGrid<Food>(200);
+  private foodCounter = 0;
+
+  public pendingFoodEvents: (
+    | { type: "spawn"; food: Food }
+    | { type: "eat"; foodId: string; playerId: string }
+  )[] = [];
 
   private readonly maxFood = 400;
   private readonly baseSpeed = 300;
@@ -30,6 +36,7 @@ export class GameEngine {
 
   constructor() {
     this.spawnInitialFood();
+    this.pendingFoodEvents = [];
   }
 
   public addPlayer(id: string, name: string): Player {
@@ -112,13 +119,19 @@ export class GameEngine {
     const x = Math.random() * this.width;
     const y = Math.random() * this.height;
 
-    return {
-      id: `food-${Math.random().toString(36).substring(2, 9)}`,
+    this.foodCounter = (this.foodCounter + 1) % 65000;
+    const foodId = this.foodCounter.toString();
+
+    const item: Food = {
+      id: foodId,
       x,
       y,
       radius,
       color
     };
+
+    this.pendingFoodEvents.push({ type: "spawn", food: item });
+    return item;
   }
 
   private maintainFoodDensity(): void {
@@ -173,6 +186,11 @@ export class GameEngine {
               if (idx !== -1) {
                 this.food.splice(idx, 1);
               }
+              this.pendingFoodEvents.push({
+                type: "eat",
+                foodId: foodItem.id,
+                playerId: player.id
+              });
             }
           }
         }
