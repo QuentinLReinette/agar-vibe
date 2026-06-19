@@ -34,3 +34,14 @@ jobs:
 
       - name: Run unit tests
         run: npm test
+
+  deploy:
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Server Deploy
+        run: curl -s -X POST "${{ secrets.RENDER_SERVER_DEPLOY_HOOK_URL }}"
+      - name: Trigger Client Deploy
+        run: curl -s -X POST "${{ secrets.RENDER_CLIENT_DEPLOY_HOOK_URL }}"
+
