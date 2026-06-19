@@ -18,9 +18,12 @@ import { CanvasRenderer } from "./render.js";
 import { InputManager } from "./input.js";
 import { StateInterpolation } from "./interpolation.js";
 
-const wsUrl = `ws://${window.location.hostname}:8080`;
+const productionWsUrl = import.meta.env.VITE_WS_URL;
+const localWsUrl = `ws://${window.location.hostname}:8080`;
+const wsUrl = productionWsUrl || localWsUrl;
 console.log("Connecting to WebSocket:", wsUrl);
 const ws = new WebSocket(wsUrl);
+
 ws.binaryType = "arraybuffer";
 
 const renderer = new CanvasRenderer("game-canvas");
