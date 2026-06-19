@@ -17,6 +17,6 @@ services:
     plan: free
     dockerfilePath: packages/client/Dockerfile
     dockerContext: .
-    dockerBuildArgs:
+    envVars:
       - key: VITE_WS_URL
         value: wss://agar-vibe-server.onrender.com

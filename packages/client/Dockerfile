@@ -13,10 +13,12 @@ CMD ["npm", "run", "dev", "--workspace=packages/client"]
 
 # Builder stage
 FROM base AS builder
+ARG VITE_WS_URL
 COPY package*.json ./
 COPY packages/shared/package*.json ./packages/shared/
 COPY packages/client/package*.json ./packages/client/
 RUN npm ci
+
 COPY tsconfig.json ./
 COPY packages/shared ./packages/shared
 COPY packages/client ./packages/client
