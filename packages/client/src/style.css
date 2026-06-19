@@ -274,6 +274,7 @@ button:focus-visible {
   box-shadow: var(--shadow-md);
   width: 260px;
   display: none; /* Controlled by JS isPlaying state */
+  pointer-events: auto;
   animation: slideInLeaderboard 0.3s var(--ease-out) both;
 }
 
@@ -365,6 +366,25 @@ button:focus-visible {
   font-size: 0.8rem;
   margin: 2px 0;
   padding: 0;
+}
+
+.leaderboard-card.clickable li:not(.leaderboard-separator) {
+  cursor: pointer;
+  transition:
+    background 0.2s var(--ease-out),
+    transform 0.1s var(--ease-out);
+  border-radius: var(--radius-inner);
+  padding: 2px 8px;
+  margin-left: -4px;
+}
+
+.leaderboard-card.clickable li:not(.leaderboard-separator):hover {
+  background: hsl(var(--primary) / 0.1);
+  transform: translateX(4px);
+}
+
+.leaderboard-card.clickable li:not(.leaderboard-separator):active {
+  transform: translateX(2px) scale(0.98);
 }
 
 @keyframes slideInLeaderboard {

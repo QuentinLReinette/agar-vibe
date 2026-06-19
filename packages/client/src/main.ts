@@ -116,6 +116,18 @@ class GameClient {
       }
     });
 
+    this.leaderboard.addEventListener("click", (e) => {
+      if (this.isSpectating) {
+        const li = (e.target as HTMLElement).closest("li");
+        if (li) {
+          const playerId = li.getAttribute("data-player-id");
+          if (playerId) {
+            this.spectatedPlayerId = playerId;
+          }
+        }
+      }
+    });
+
     // Start rendering/prediction loop
     requestAnimationFrame(() => this.gameLoop());
   }
@@ -283,6 +295,7 @@ class GameClient {
       this.predictedY = WORLD_SIZE / 2;
       this.predictedRadius = 10;
       this.lobby.style.opacity = "0";
+      this.leaderboard.classList.add("clickable");
       setTimeout(() => {
         if (this.isSpectating) {
           this.lobby.style.display = "none";
@@ -296,6 +309,7 @@ class GameClient {
   private exitSpectating(): void {
     this.isSpectating = false;
     this.spectatedPlayerId = null;
+    this.leaderboard.classList.remove("clickable");
     this.spectateHud.style.display = "none";
     this.leaderboard.style.display = "none";
     this.lobby.style.display = "block";
@@ -328,6 +342,7 @@ class GameClient {
     this.isPlaying = false;
     this.isSpectating = false;
     this.spectatedPlayerId = null;
+    this.leaderboard.classList.remove("clickable");
     this.inputManager.stop();
     this.hud.style.display = "none";
     this.spectateHud.style.display = "none";
@@ -517,19 +532,19 @@ class GameClient {
       top10.forEach((entry, idx) => {
         const isSelf = idx === localIndex;
         const className = isSelf ? ' class="leaderboard-self"' : "";
-        html += `<li${className}>${entry.name}<span class="leaderboard-score">${entry.score}</span></li>`;
+        html += `<li${className} data-player-id="${entry.id}">${entry.name}<span class="leaderboard-score">${entry.score}</span></li>`;
       });
     } else {
       // Local player is rank 11 or below: show top 9 + ellipsis + local player
       const top9 = entries.slice(0, 9);
       top9.forEach((entry) => {
-        html += `<li>${entry.name}<span class="leaderboard-score">${entry.score}</span></li>`;
+        html += `<li data-player-id="${entry.id}">${entry.name}<span class="leaderboard-score">${entry.score}</span></li>`;
       });
 
       html += `<li class="leaderboard-separator">...</li>`;
 
       const selfEntry = entries[localIndex];
-      html += `<li value="${localIndex + 1}" class="leaderboard-self">${selfEntry.name}<span class="leaderboard-score">${selfEntry.score}</span></li>`;
+      html += `<li value="${localIndex + 1}" class="leaderboard-self" data-player-id="${selfEntry.id}">${selfEntry.name}<span class="leaderboard-score">${selfEntry.score}</span></li>`;
     }
 
     if (this.leaderboardList.innerHTML !== html) {
