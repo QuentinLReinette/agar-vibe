@@ -63,8 +63,11 @@ class GameClient {
   private leaderboardFrameCount = 0;
   private spectateHud = document.getElementById("spectate-hud")!;
   private spectateName = document.getElementById("spectate-name")!;
+  private prevSpectateButton = document.getElementById("prev-spectate-button")!;
+  private nextSpectateButton = document.getElementById("next-spectate-button")!;
   private exitSpectateButton = document.getElementById("exit-spectate-button")!;
   private isSpectating = false;
+  private spectatedPlayerId: string | null = null;
 
   private lastInputSentTime = 0;
   private lastAngle = 0;
@@ -96,9 +99,21 @@ class GameClient {
 
     this.playButton.addEventListener("click", () => this.joinGame());
     this.spectateButton.addEventListener("click", () => this.startSpectating());
+    this.prevSpectateButton.addEventListener("click", () => this.cycleSpectateTarget(-1));
+    this.nextSpectateButton.addEventListener("click", () => this.cycleSpectateTarget(1));
     this.exitSpectateButton.addEventListener("click", () => this.exitSpectating());
     this.nicknameInput.addEventListener("keypress", (e) => {
       if (e.key === "Enter") this.joinGame();
+    });
+
+    window.addEventListener("keydown", (e) => {
+      if (this.isSpectating) {
+        if (e.key === "ArrowLeft" || e.key === "a" || e.key === "A") {
+          this.cycleSpectateTarget(-1);
+        } else if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") {
+          this.cycleSpectateTarget(1);
+        }
+      }
     });
 
     // Start rendering/prediction loop
@@ -280,6 +295,7 @@ class GameClient {
 
   private exitSpectating(): void {
     this.isSpectating = false;
+    this.spectatedPlayerId = null;
     this.spectateHud.style.display = "none";
     this.leaderboard.style.display = "none";
     this.lobby.style.display = "block";
@@ -287,9 +303,31 @@ class GameClient {
     this.lobby.style.opacity = "1";
   }
 
+  private cycleSpectateTarget(direction: number): void {
+    if (!this.latestState || this.latestState.players.length === 0) {
+      this.spectatedPlayerId = null;
+      return;
+    }
+
+    // Sort players descending by score (same order as leaderboard)
+    const sortedPlayers = [...this.latestState.players].sort((a, b) => b.score - a.score);
+
+    let currentIndex = 0;
+    if (this.spectatedPlayerId) {
+      const idx = sortedPlayers.findIndex((p) => p.id === this.spectatedPlayerId);
+      if (idx !== -1) {
+        currentIndex = idx;
+      }
+    }
+
+    const newIndex = (currentIndex + direction + sortedPlayers.length) % sortedPlayers.length;
+    this.spectatedPlayerId = sortedPlayers[newIndex].id;
+  }
+
   private showLobby(): void {
     this.isPlaying = false;
     this.isSpectating = false;
+    this.spectatedPlayerId = null;
     this.inputManager.stop();
     this.hud.style.display = "none";
     this.spectateHud.style.display = "none";
@@ -368,10 +406,17 @@ class GameClient {
     const state = this.interpolation.getInterpolatedState();
     if (state) {
       if (this.isSpectating) {
-        const target = state.players.reduce(
-          (max, p) => (p.score > max.score ? p : max),
-          state.players[0]
-        );
+        let target = null;
+        if (this.spectatedPlayerId) {
+          target = state.players.find((p) => p.id === this.spectatedPlayerId);
+        }
+        if (!target) {
+          target = state.players.reduce(
+            (max, p) => (p.score > max.score ? p : max),
+            state.players[0]
+          );
+        }
+
         if (target && target.cells[0]) {
           const cell = target.cells[0];
           this.predictedX += (cell.x - this.predictedX) * 0.1;
