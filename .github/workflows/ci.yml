@@ -39,9 +39,15 @@ jobs:
     needs: build-and-test
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
+    env:
+      SERVER_HOOK: ${{ secrets.RENDER_SERVER_DEPLOY_HOOK_URL }}
+      CLIENT_HOOK: ${{ secrets.RENDER_CLIENT_DEPLOY_HOOK_URL }}
     steps:
       - name: Trigger Server Deploy
-        run: curl -s -X POST "${{ secrets.RENDER_SERVER_DEPLOY_HOOK_URL }}"
+        if: env.SERVER_HOOK != ''
+        run: curl -s -X POST "$SERVER_HOOK"
       - name: Trigger Client Deploy
-        run: curl -s -X POST "${{ secrets.RENDER_CLIENT_DEPLOY_HOOK_URL }}"
+        if: env.CLIENT_HOOK != ''
+        run: curl -s -X POST "$CLIENT_HOOK"
+
 
