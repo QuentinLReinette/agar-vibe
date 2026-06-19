@@ -4,6 +4,8 @@ import {
   Food,
   PACKET_TYPES,
   COLORS,
+  WORLD_SIZE,
+  BASE_SPEED,
   serializeJoin,
   serializeInput,
   deserializeWelcome,
@@ -18,30 +20,10 @@ import { CanvasRenderer } from "./render.js";
 import { InputManager } from "./input.js";
 import { StateInterpolation } from "./interpolation.js";
 
-const productionWsUrl = import.meta.env.VITE_WS_URL;
-const localWsUrl = `ws://${window.location.hostname}:8080`;
-const wsUrl = productionWsUrl || localWsUrl;
-console.log("Connecting to WebSocket:", wsUrl);
-const ws = new WebSocket(wsUrl);
-
-ws.binaryType = "arraybuffer";
-
-const renderer = new CanvasRenderer("game-canvas");
-const inputManager = new InputManager();
-const interpolation = new StateInterpolation();
-
 interface RegistryEntry {
   name: string;
   color: string;
 }
-
-const playerRegistry: Map<string, RegistryEntry> = new Map();
-const activeFoods: Map<string, Food> = new Map();
-
-let localPlayerId: string | null = null;
-let isPlaying = false;
-let hasSpawned = false;
-let latestState: GameState | null = null;
 
 interface PendingInput {
   seq: number;
@@ -49,298 +31,353 @@ interface PendingInput {
   speed: number;
   dt: number;
 }
-const pendingInputs: PendingInput[] = [];
-let predictedX = 0;
-let predictedY = 0;
-let predictedRadius = 10;
-let predictedMass = 10;
 
-const lobby = document.getElementById("lobby")!;
-const nicknameInput = document.getElementById("nickname-input")! as HTMLInputElement;
-const playButton = document.getElementById("play-button")!;
-const hud = document.getElementById("hud")!;
-const scoreVal = document.getElementById("score-val")!;
+class GameClient {
+  private ws: WebSocket | null = null;
+  private renderer: CanvasRenderer;
+  private inputManager: InputManager;
+  private interpolation: StateInterpolation;
 
-ws.addEventListener("open", () => {
-  console.log("Connected to server!");
-});
+  private playerRegistry: Map<string, RegistryEntry> = new Map();
+  private activeFoods: Map<string, Food> = new Map();
 
-ws.addEventListener("message", (event) => {
-  try {
-    const arrayBuffer = event.data as ArrayBuffer;
-    const view = new DataView(arrayBuffer);
-    const packetType = view.getUint8(0);
+  private localPlayerId: string | null = null;
+  private isPlaying = false;
+  private hasSpawned = false;
+  private latestState: GameState | null = null;
 
-    switch (packetType) {
-      case PACKET_TYPES.WELCOME: {
-        const id = deserializeWelcome(view);
-        localPlayerId = id.toString();
-        console.log("Joined session with playerId:", localPlayerId);
-        break;
-      }
-      case PACKET_TYPES.PLAYER_REGISTRY: {
-        const entries = deserializePlayerRegistry(view);
-        for (const entry of entries) {
-          playerRegistry.set(entry.id.toString(), {
-            name: entry.name,
-            color: COLORS[entry.colorIndex] || "#ffffff"
-          });
+  private pendingInputs: PendingInput[] = [];
+  private predictedX = 0;
+  private predictedY = 0;
+  private predictedRadius = 10;
+  private predictedMass = 10;
+
+  private lobby = document.getElementById("lobby")!;
+  private nicknameInput = document.getElementById("nickname-input")! as HTMLInputElement;
+  private playButton = document.getElementById("play-button")!;
+  private hud = document.getElementById("hud")!;
+  private scoreVal = document.getElementById("score-val")!;
+
+  private lastInputSentTime = 0;
+  private lastAngle = 0;
+  private lastSpeed = 0;
+  private clientSeq = 0;
+  private lastFrameTime = performance.now();
+
+  constructor() {
+    this.renderer = new CanvasRenderer("game-canvas");
+    this.inputManager = new InputManager();
+    this.interpolation = new StateInterpolation();
+  }
+
+  public init(): void {
+    const productionWsUrl = import.meta.env.VITE_WS_URL;
+    const localWsUrl = `ws://${window.location.hostname}:8080`;
+    const wsUrl = productionWsUrl || localWsUrl;
+    console.log("Connecting to WebSocket:", wsUrl);
+
+    this.ws = new WebSocket(wsUrl);
+    this.ws.binaryType = "arraybuffer";
+
+    this.ws.addEventListener("open", () => {
+      console.log("Connected to server!");
+    });
+
+    this.ws.addEventListener("message", (event) => this.handleMessage(event));
+    this.ws.addEventListener("close", () => this.handleClose());
+
+    this.playButton.addEventListener("click", () => this.joinGame());
+    this.nicknameInput.addEventListener("keypress", (e) => {
+      if (e.key === "Enter") this.joinGame();
+    });
+
+    // Start rendering/prediction loop
+    requestAnimationFrame(() => this.gameLoop());
+  }
+
+  private handleMessage(event: MessageEvent): void {
+    try {
+      const arrayBuffer = event.data as ArrayBuffer;
+      const view = new DataView(arrayBuffer);
+      const packetType = view.getUint8(0);
+
+      switch (packetType) {
+        case PACKET_TYPES.WELCOME: {
+          const id = deserializeWelcome(view);
+          this.localPlayerId = id.toString();
+          console.log("Joined session with playerId:", this.localPlayerId);
+          break;
         }
-        break;
-      }
-      case PACKET_TYPES.PLAYER_REMOVE: {
-        const id = deserializePlayerRemove(view);
-        playerRegistry.delete(id.toString());
-        break;
-      }
-      case PACKET_TYPES.INITIAL_FOOD: {
-        const foods = deserializeInitialFood(view);
-        activeFoods.clear();
-        for (const f of foods) {
+        case PACKET_TYPES.PLAYER_REGISTRY: {
+          const entries = deserializePlayerRegistry(view);
+          for (const entry of entries) {
+            this.playerRegistry.set(entry.id.toString(), {
+              name: entry.name,
+              color: COLORS[entry.colorIndex] || "#ffffff"
+            });
+          }
+          break;
+        }
+        case PACKET_TYPES.PLAYER_REMOVE: {
+          const id = deserializePlayerRemove(view);
+          this.playerRegistry.delete(id.toString());
+          break;
+        }
+        case PACKET_TYPES.INITIAL_FOOD: {
+          const foods = deserializeInitialFood(view);
+          this.activeFoods.clear();
+          for (const f of foods) {
+            const foodId = f.id.toString();
+            this.activeFoods.set(foodId, {
+              id: foodId,
+              x: f.x,
+              y: f.y,
+              radius: 6,
+              color: COLORS[f.colorIndex] || "#ffffff"
+            });
+          }
+          break;
+        }
+        case PACKET_TYPES.FOOD_SPAWN: {
+          const f = deserializeFoodSpawn(view);
           const foodId = f.id.toString();
-          activeFoods.set(foodId, {
+          this.activeFoods.set(foodId, {
             id: foodId,
             x: f.x,
             y: f.y,
             radius: 6,
             color: COLORS[f.colorIndex] || "#ffffff"
           });
+          break;
         }
-        break;
-      }
-      case PACKET_TYPES.FOOD_SPAWN: {
-        const f = deserializeFoodSpawn(view);
-        const foodId = f.id.toString();
-        activeFoods.set(foodId, {
-          id: foodId,
-          x: f.x,
-          y: f.y,
-          radius: 6,
-          color: COLORS[f.colorIndex] || "#ffffff"
-        });
-        break;
-      }
-      case PACKET_TYPES.FOOD_EATEN: {
-        const { foodId } = deserializeFoodEaten(view);
-        activeFoods.delete(foodId.toString());
-        break;
-      }
-      case PACKET_TYPES.GAME_TICK: {
-        const tick = deserializeGameTick(view);
-        const players = tick.players;
+        case PACKET_TYPES.FOOD_EATEN: {
+          const { foodId } = deserializeFoodEaten(view);
+          this.activeFoods.delete(foodId.toString());
+          break;
+        }
+        case PACKET_TYPES.GAME_TICK: {
+          const tick = deserializeGameTick(view);
+          const players = tick.players;
 
-        const mappedPlayers = players.map((p) => {
-          const pId = p.id.toString();
-          const reg = playerRegistry.get(pId);
-          return {
-            id: pId,
-            name: reg ? reg.name : "Guest",
-            color: reg ? reg.color : "#ffffff",
-            cells: [
-              {
-                id: `${pId}-cell-0`,
-                x: p.x,
-                y: p.y,
-                radius: p.radius,
-                mass: p.score
-              }
-            ],
-            score: p.score
+          const mappedPlayers = players.map((p) => {
+            const pId = p.id.toString();
+            const reg = this.playerRegistry.get(pId);
+            return {
+              id: pId,
+              name: reg ? reg.name : "Guest",
+              color: reg ? reg.color : "#ffffff",
+              cells: [
+                {
+                  id: `${pId}-cell-0`,
+                  x: p.x,
+                  y: p.y,
+                  radius: p.radius,
+                  mass: p.score
+                }
+              ],
+              score: p.score
+            };
+          });
+
+          const tickState: GameState = {
+            width: WORLD_SIZE,
+            height: WORLD_SIZE,
+            players: mappedPlayers,
+            food: Array.from(this.activeFoods.values())
           };
-        });
 
-        const tickState: GameState = {
-          width: 4000,
-          height: 4000,
-          players: mappedPlayers,
-          food: Array.from(activeFoods.values())
-        };
+          this.interpolation.addTick(tickState);
+          this.latestState = tickState;
 
-        interpolation.addTick(tickState);
-        latestState = tickState;
+          const serverLocalPlayer = players.find((p) => p.id === Number(this.localPlayerId));
+          if (serverLocalPlayer && this.hasSpawned) {
+            this.predictedX = serverLocalPlayer.x;
+            this.predictedY = serverLocalPlayer.y;
+            this.predictedRadius = serverLocalPlayer.radius;
+            this.predictedMass = serverLocalPlayer.score;
 
-        const serverLocalPlayer = players.find((p) => p.id === Number(localPlayerId));
-        if (serverLocalPlayer && hasSpawned) {
-          predictedX = serverLocalPlayer.x;
-          predictedY = serverLocalPlayer.y;
-          predictedRadius = serverLocalPlayer.radius;
-          predictedMass = serverLocalPlayer.score;
+            while (
+              this.pendingInputs.length > 0 &&
+              this.pendingInputs[0].seq <= tick.lastProcessedSeq
+            ) {
+              this.pendingInputs.shift();
+            }
 
-          while (pendingInputs.length > 0 && pendingInputs[0].seq <= tick.lastProcessedSeq) {
-            pendingInputs.shift();
+            for (const pending of this.pendingInputs) {
+              const predicted = this.predictCellPosition(
+                this.predictedX,
+                this.predictedY,
+                this.predictedRadius,
+                this.predictedMass,
+                pending.angle,
+                pending.speed,
+                pending.dt
+              );
+              this.predictedX = predicted.x;
+              this.predictedY = predicted.y;
+            }
           }
-
-          for (const pending of pendingInputs) {
-            const speedModifier = 300 / Math.sqrt(predictedMass);
-            const velocity = speedModifier * pending.speed;
-
-            predictedX += Math.cos(pending.angle) * velocity * pending.dt;
-            predictedY += Math.sin(pending.angle) * velocity * pending.dt;
-
-            predictedX = Math.max(predictedRadius, Math.min(4000 - predictedRadius, predictedX));
-            predictedY = Math.max(predictedRadius, Math.min(4000 - predictedRadius, predictedY));
-          }
+          break;
         }
-        break;
+      }
+    } catch (err) {
+      console.error("Error parsing message from server:", err);
+    }
+  }
+
+  private handleClose(): void {
+    console.log("Connection closed.");
+    this.showLobby();
+  }
+
+  private joinGame(): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+
+    const name = this.nicknameInput.value.trim() || "Guest";
+    this.ws.send(serializeJoin(name));
+
+    this.isPlaying = true;
+    this.hasSpawned = false;
+    this.lobby.style.opacity = "0";
+    setTimeout(() => {
+      if (this.isPlaying) {
+        this.lobby.style.display = "none";
+        this.hud.style.display = "block";
+      }
+    }, 300);
+
+    this.inputManager.start();
+  }
+
+  private showLobby(): void {
+    this.isPlaying = false;
+    this.inputManager.stop();
+    this.hud.style.display = "none";
+    this.lobby.style.display = "block";
+    // Trigger reflow for transition
+    void this.lobby.offsetHeight;
+    this.lobby.style.opacity = "1";
+    this.nicknameInput.focus();
+    this.pendingInputs.length = 0;
+    this.clientSeq = 0;
+  }
+
+  private predictCellPosition(
+    x: number,
+    y: number,
+    radius: number,
+    mass: number,
+    angle: number,
+    speed: number,
+    dt: number
+  ): { x: number; y: number } {
+    const speedModifier = BASE_SPEED / Math.sqrt(mass);
+    const velocity = speedModifier * speed;
+    const newX = x + Math.cos(angle) * velocity * dt;
+    const newY = y + Math.sin(angle) * velocity * dt;
+    return {
+      x: Math.max(radius, Math.min(WORLD_SIZE - radius, newX)),
+      y: Math.max(radius, Math.min(WORLD_SIZE - radius, newY))
+    };
+  }
+
+  private gameLoop(): void {
+    const now = performance.now();
+    let dt = (now - this.lastFrameTime) / 1000;
+    this.lastFrameTime = now;
+    dt = Math.min(dt, 0.1);
+
+    if (this.isPlaying && this.ws && this.ws.readyState === WebSocket.OPEN) {
+      const input = this.inputManager.getInput();
+
+      const angleDiff = Math.abs(input.angle - this.lastAngle);
+      const speedDiff = Math.abs(input.speed - this.lastSpeed);
+
+      if (now - this.lastInputSentTime > 33 || angleDiff > 0.05 || speedDiff > 0.05) {
+        this.clientSeq++;
+        this.ws.send(serializeInput(this.clientSeq, input.angle, input.speed));
+
+        this.lastAngle = input.angle;
+        this.lastSpeed = input.speed;
+        this.lastInputSentTime = now;
+      }
+
+      if (this.hasSpawned) {
+        const predicted = this.predictCellPosition(
+          this.predictedX,
+          this.predictedY,
+          this.predictedRadius,
+          this.predictedMass,
+          input.angle,
+          input.speed,
+          dt
+        );
+        this.predictedX = predicted.x;
+        this.predictedY = predicted.y;
+
+        this.pendingInputs.push({
+          seq: this.clientSeq,
+          angle: input.angle,
+          speed: input.speed,
+          dt
+        });
       }
     }
-  } catch (err) {
-    console.error("Error parsing message from server:", err);
-  }
-});
 
-ws.addEventListener("close", () => {
-  console.log("Connection closed.");
-  showLobby();
-});
+    const state = this.interpolation.getInterpolatedState();
+    if (state) {
+      if (this.isPlaying && this.hasSpawned) {
+        this.renderer.render(
+          state,
+          this.localPlayerId,
+          this.predictedX,
+          this.predictedY,
+          this.predictedRadius
+        );
+      } else {
+        this.renderer.render(state, this.localPlayerId);
+      }
 
-function joinGame() {
-  if (ws.readyState !== WebSocket.OPEN) return;
-
-  const name = nicknameInput.value.trim() || "Guest";
-  ws.send(serializeJoin(name));
-
-  isPlaying = true;
-  hasSpawned = false;
-  lobby.style.opacity = "0";
-  setTimeout(() => {
-    if (isPlaying) {
-      lobby.style.display = "none";
-      hud.style.display = "block";
-    }
-  }, 300);
-
-  inputManager.start();
-}
-
-function showLobby() {
-  isPlaying = false;
-  inputManager.stop();
-  hud.style.display = "none";
-  lobby.style.display = "block";
-  // Trigger reflow for transition
-  void lobby.offsetHeight;
-  lobby.style.opacity = "1";
-  nicknameInput.focus();
-  pendingInputs.length = 0;
-  clientSeq = 0;
-}
-
-playButton.addEventListener("click", joinGame);
-nicknameInput.addEventListener("keypress", (e) => {
-  if (e.key === "Enter") joinGame();
-});
-
-let lastInputSentTime = 0;
-let lastAngle = 0;
-let lastSpeed = 0;
-let clientSeq = 0;
-let lastFrameTime = performance.now();
-
-function gameTick() {
-  const now = performance.now();
-  let dt = (now - lastFrameTime) / 1000;
-  lastFrameTime = now;
-  dt = Math.min(dt, 0.1);
-
-  if (isPlaying && ws.readyState === WebSocket.OPEN) {
-    const input = inputManager.getInput();
-
-    const angleDiff = Math.abs(input.angle - lastAngle);
-    const speedDiff = Math.abs(input.speed - lastSpeed);
-
-    if (now - lastInputSentTime > 33 || angleDiff > 0.05 || speedDiff > 0.05) {
-      clientSeq++;
-      ws.send(serializeInput(clientSeq, input.angle, input.speed));
-
-      lastAngle = input.angle;
-      lastSpeed = input.speed;
-      lastInputSentTime = now;
-    }
-
-    if (hasSpawned) {
-      const speedModifier = 300 / Math.sqrt(predictedMass);
-      const velocity = speedModifier * input.speed;
-
-      predictedX += Math.cos(input.angle) * velocity * dt;
-      predictedY += Math.sin(input.angle) * velocity * dt;
-
-      predictedX = Math.max(predictedRadius, Math.min(4000 - predictedRadius, predictedX));
-      predictedY = Math.max(predictedRadius, Math.min(4000 - predictedRadius, predictedY));
-
-      pendingInputs.push({
-        seq: clientSeq,
-        angle: input.angle,
-        speed: input.speed,
-        dt
-      });
-    }
-  }
-
-  const state = interpolation.getInterpolatedState();
-  if (state) {
-    if (isPlaying && hasSpawned) {
-      renderer.render(state, localPlayerId, predictedX, predictedY, predictedRadius);
+      if (this.isPlaying && this.localPlayerId) {
+        const player = state.players.find((p) => p.id === this.localPlayerId);
+        if (player) {
+          this.scoreVal.innerText = player.score.toString();
+        }
+      }
     } else {
-      renderer.render(state, localPlayerId);
+      this.drawLoadingScreen();
     }
 
-    if (isPlaying && localPlayerId) {
-      const player = state.players.find((p) => p.id === localPlayerId);
-      if (player) {
-        scoreVal.innerText = player.score.toString();
-      }
-    }
-  } else {
-    drawLoadingScreen();
-  }
-
-  // Death detection checks against raw latestState (prevents LERP window timing bugs)
-  if (isPlaying && localPlayerId && latestState) {
-    const playerExists = latestState.players.some((p: Player) => p.id === localPlayerId);
-    if (playerExists && !hasSpawned) {
-      console.log("[DEBUG] Player found in latestState. Setting hasSpawned = true.", {
-        localPlayerId,
-        players: latestState.players.map((p: Player) => p.id)
-      });
-      hasSpawned = true;
-
-      const localPlayer = latestState.players.find((p) => p.id === localPlayerId);
-      if (localPlayer && localPlayer.cells.length > 0) {
-        predictedX = localPlayer.cells[0].x;
-        predictedY = localPlayer.cells[0].y;
-        predictedRadius = localPlayer.cells[0].radius;
-        predictedMass = localPlayer.cells[0].mass;
+    // Death detection checks against raw latestState (prevents LERP window timing bugs)
+    if (this.isPlaying && this.localPlayerId && this.latestState) {
+      const playerExists = this.latestState.players.some(
+        (p: Player) => p.id === this.localPlayerId
+      );
+      if (this.hasSpawned && !playerExists) {
+        console.log("[DEBUG] Player not found in latestState. Death triggered.");
+        this.showLobby();
+      } else if (!this.hasSpawned && playerExists) {
+        console.log("[DEBUG] Player found in latestState. Setting hasSpawned = true.");
+        this.hasSpawned = true;
       }
     }
 
-    if (hasSpawned && !playerExists) {
-      console.log("[DEBUG] Game over! Died because playerExists is false but hasSpawned is true.", {
-        localPlayerId,
-        hasSpawned,
-        playerExists,
-        players: latestState.players.map((p: Player) => p.id)
-      });
-      showLobby();
-    }
+    requestAnimationFrame(() => this.gameLoop());
   }
 
-  requestAnimationFrame(gameTick);
+  private drawLoadingScreen(): void {
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    const ctx = (document.getElementById("game-canvas") as HTMLCanvasElement).getContext("2d")!;
+    ctx.fillStyle = "#08090d";
+    ctx.fillRect(0, 0, width, height);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = 'bold 24px "Inter", system-ui, sans-serif';
+    ctx.textAlign = "center";
+    ctx.fillText("Connecting to Server...", width / 2, height / 2);
+  }
 }
 
-function drawLoadingScreen() {
-  const canvas = document.getElementById("game-canvas") as HTMLCanvasElement;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-
-  ctx.fillStyle = "#08090d";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  ctx.fillStyle = "#66fcf1";
-  ctx.font = '24px "Inter", sans-serif';
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText("CONNECTING TO VIBE SERVER...", canvas.width / 2, canvas.height / 2);
-}
-
-requestAnimationFrame(gameTick);
+// Start Game Client
+const client = new GameClient();
+client.init();
