@@ -235,6 +235,123 @@ button:focus-visible {
   }
 }
 
+/* Molecules: Leaderboard element */
+.leaderboard-card {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  background: hsla(var(--muted) / 0.85);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--border);
+  padding: 16px 24px;
+  border-radius: var(--radius-inner);
+  box-shadow: var(--shadow-md);
+  width: 260px;
+  display: none; /* Controlled by JS isPlaying state */
+  animation: slideInLeaderboard 0.3s var(--ease-out) both;
+}
+
+.leaderboard-card h3 {
+  margin: 0 0 12px 0;
+  font-size: 1rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: hsl(var(--foreground));
+  border-bottom: 1px solid hsl(var(--primary) / 0.2);
+  padding-bottom: 8px;
+}
+
+.leaderboard-card ol {
+  margin: 0;
+  padding: 0 0 0 20px;
+  list-style-type: decimal;
+  font-family: "Outfit", sans-serif;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: hsl(var(--muted-foreground));
+}
+
+.leaderboard-card li {
+  margin-bottom: 6px;
+  padding-left: 4px;
+}
+
+.leaderboard-card li::marker {
+  color: hsl(var(--primary) / 0.5);
+  font-family: "JetBrains Mono", monospace;
+}
+
+/* Style top entries uniquely */
+.leaderboard-card li:nth-child(1) {
+  color: hsl(var(--primary));
+}
+.leaderboard-card li:nth-child(1)::marker {
+  color: hsl(var(--primary));
+  font-weight: bold;
+}
+
+.leaderboard-card li:nth-child(2) {
+  color: hsl(var(--accent));
+}
+.leaderboard-card li:nth-child(2)::marker {
+  color: hsl(var(--accent));
+}
+
+.leaderboard-card li .leaderboard-score {
+  float: right;
+  font-family: "JetBrains Mono", monospace;
+  font-variant-numeric: tabular-nums;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.85rem;
+}
+
+.leaderboard-card li:nth-child(1) .leaderboard-score {
+  color: hsl(var(--primary));
+}
+
+.leaderboard-card li:nth-child(2) .leaderboard-score {
+  color: hsl(var(--accent));
+}
+
+/* Highlight local player */
+.leaderboard-card li.leaderboard-self {
+  color: hsl(var(--primary));
+  font-weight: 800;
+  text-shadow: 0 0 8px hsla(var(--primary), 0.3);
+}
+
+.leaderboard-card li.leaderboard-self::marker {
+  color: hsl(var(--primary));
+  font-weight: 800;
+}
+
+.leaderboard-card li.leaderboard-self .leaderboard-score {
+  color: hsl(var(--primary));
+  font-weight: 800;
+}
+
+/* Ellipsis separator */
+.leaderboard-card li.leaderboard-separator {
+  list-style-type: none;
+  text-align: center;
+  color: hsl(var(--muted-foreground) / 0.4);
+  font-size: 0.8rem;
+  margin: 2px 0;
+  padding: 0;
+}
+
+@keyframes slideInLeaderboard {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* Keyboard accessibility outline */
 :focus-visible {
   outline: 2px solid hsl(var(--ring));

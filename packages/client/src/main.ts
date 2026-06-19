@@ -57,6 +57,9 @@ class GameClient {
   private playButton = document.getElementById("play-button")!;
   private hud = document.getElementById("hud")!;
   private scoreVal = document.getElementById("score-val")!;
+  private leaderboard = document.getElementById("leaderboard")!;
+  private leaderboardList = document.getElementById("leaderboard-list")!;
+  private leaderboardFrameCount = 0;
 
   private lastInputSentTime = 0;
   private lastAngle = 0;
@@ -243,6 +246,7 @@ class GameClient {
       if (this.isPlaying) {
         this.lobby.style.display = "none";
         this.hud.style.display = "block";
+        this.leaderboard.style.display = "block";
       }
     }, 300);
 
@@ -253,6 +257,7 @@ class GameClient {
     this.isPlaying = false;
     this.inputManager.stop();
     this.hud.style.display = "none";
+    this.leaderboard.style.display = "none";
     this.lobby.style.display = "block";
     // Trigger reflow for transition
     void this.lobby.offsetHeight;
@@ -344,6 +349,10 @@ class GameClient {
           this.scoreVal.innerText = player.score.toString();
         }
       }
+
+      if (this.isPlaying) {
+        this.updateLeaderboard(state);
+      }
     } else {
       this.drawLoadingScreen();
     }
@@ -375,6 +384,51 @@ class GameClient {
     ctx.font = 'bold 24px "Inter", system-ui, sans-serif';
     ctx.textAlign = "center";
     ctx.fillText("Connecting to Server...", width / 2, height / 2);
+  }
+
+  private updateLeaderboard(state: GameState): void {
+    this.leaderboardFrameCount++;
+    if (this.leaderboardFrameCount % 12 !== 0) return;
+
+    const entries = state.players.map((p) => {
+      const registryEntry = this.playerRegistry.get(p.id.toString());
+      return {
+        id: p.id.toString(),
+        name: registryEntry ? registryEntry.name : `Guest-${p.id}`,
+        score: p.score
+      };
+    });
+
+    // Sort descending by score
+    entries.sort((a, b) => b.score - a.score);
+
+    const localIndex = entries.findIndex((e) => e.id === this.localPlayerId);
+    let html = "";
+
+    if (localIndex === -1 || localIndex < 10) {
+      // Local player is in top 10 or not active: show standard top 10
+      const top10 = entries.slice(0, 10);
+      top10.forEach((entry, idx) => {
+        const isSelf = idx === localIndex;
+        const className = isSelf ? ' class="leaderboard-self"' : "";
+        html += `<li${className}>${entry.name}<span class="leaderboard-score">${entry.score}</span></li>`;
+      });
+    } else {
+      // Local player is rank 11 or below: show top 9 + ellipsis + local player
+      const top9 = entries.slice(0, 9);
+      top9.forEach((entry) => {
+        html += `<li>${entry.name}<span class="leaderboard-score">${entry.score}</span></li>`;
+      });
+
+      html += `<li class="leaderboard-separator">...</li>`;
+
+      const selfEntry = entries[localIndex];
+      html += `<li value="${localIndex + 1}" class="leaderboard-self">${selfEntry.name}<span class="leaderboard-score">${selfEntry.score}</span></li>`;
+    }
+
+    if (this.leaderboardList.innerHTML !== html) {
+      this.leaderboardList.innerHTML = html;
+    }
   }
 }
 
