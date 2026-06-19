@@ -1,22 +1,9 @@
-import { checkCircleCircle, SpatialGrid } from "@agar-vibe/shared";
+import { checkCircleCircle, SpatialGrid, COLORS, WORLD_SIZE, BASE_SPEED } from "@agar-vibe/shared";
 import { Player, PlayerCell, Food, GameState } from "@agar-vibe/shared";
 
-const COLORS = [
-  "#ff5722", // orange
-  "#e91e63", // pink
-  "#9c27b0", // purple
-  "#3f51b5", // indigo
-  "#00bcd4", // cyan
-  "#4caf50", // green
-  "#ffeb3b", // yellow
-  "#ff9800", // amber
-  "#009688", // teal
-  "#673ab7" // deep purple
-];
-
 export class GameEngine {
-  public readonly width = 4000;
-  public readonly height = 4000;
+  public readonly width = WORLD_SIZE;
+  public readonly height = WORLD_SIZE;
 
   private players: Map<string, Player> = new Map();
   private food: Food[] = [];
@@ -29,7 +16,7 @@ export class GameEngine {
   )[] = [];
 
   private readonly maxFood = 400;
-  private readonly baseSpeed = 300;
+  private readonly baseSpeed = BASE_SPEED;
 
   // Track inputs for each player: { id: { angle, speed } }
   private playerInputs: Map<string, { angle: number; speed: number }> = new Map();
@@ -206,15 +193,15 @@ export class GameEngine {
           if (player.id === otherPlayer.id) continue;
 
           otherPlayer.cells = otherPlayer.cells.filter((otherCell) => {
-            // Distance check
+            // Distance check (squared to avoid Math.sqrt)
             const dx = cell.x - otherCell.x;
             const dy = cell.y - otherCell.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
+            const distSq = dx * dx + dy * dy;
 
             // Eat condition:
             // 1. Current cell is 10% larger than other cell in mass
-            // 2. Center of smaller cell is within larger cell's circle (dist < radius)
-            if (cell.mass > otherCell.mass * 1.1 && dist < cell.radius) {
+            // 2. Center of smaller cell is within larger cell's circle (distSq < radius^2)
+            if (cell.mass > otherCell.mass * 1.1 && distSq < cell.radius * cell.radius) {
               cell.mass += otherCell.mass;
               cell.radius = this.calculateRadius(cell.mass);
               player.score = this.calculateTotalScore(player);
