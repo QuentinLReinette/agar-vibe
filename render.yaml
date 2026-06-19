@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: agar-vibe-server
+    env: docker
+    plan: free
+    dockerfilePath: packages/server/Dockerfile
+    dockerContext: .
+    envVars:
+      - key: PORT
+        value: 8080
+      - key: NODE_ENV
+        value: production
+
+  - type: web
+    name: agar-vibe-client
+    env: docker
+    plan: free
+    dockerfilePath: packages/client/Dockerfile
+    dockerContext: .
+    dockerBuildArgs:
+      - key: VITE_WS_URL
+        value: wss://agar-vibe-server.onrender.com
