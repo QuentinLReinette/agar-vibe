@@ -2,7 +2,7 @@ import { PlayerCell, Food, Player, SpatialGrid } from "@agar-vibe/shared";
 import { GameEngine } from "./game.js";
 
 export class BotManager {
-  private readonly targetBotCount = 10;
+  private readonly targetBotCount = 20;
   private botIdCounter = 10000;
   private botIds: Set<string> = new Set();
 
@@ -24,7 +24,15 @@ export class BotManager {
     "Bishop",
     "Ash",
     "Gort",
-    "Clank"
+    "Clank",
+    "Baymax",
+    "KITT",
+    "TARS",
+    "CASE",
+    "Sunny",
+    "Doc Brown",
+    "Terminator",
+    "Skynet"
   ];
 
   public getBotIds(): Set<string> {
