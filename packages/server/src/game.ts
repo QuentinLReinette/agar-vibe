@@ -1,5 +1,13 @@
 import { checkCircleCircle, SpatialGrid, COLORS, WORLD_SIZE, BASE_SPEED } from "@agar-vibe/shared";
 import { Player, PlayerCell, Food, GameState } from "@agar-vibe/shared";
+import { BotManager } from "./bot.js";
+
+export interface PlayerEvent {
+  type: "join" | "leave";
+  id: string;
+  name?: string;
+  color?: string;
+}
 
 export class GameEngine {
   public readonly width = WORLD_SIZE;
@@ -15,8 +23,12 @@ export class GameEngine {
     | { type: "eat"; foodId: string; playerId: string }
   )[] = [];
 
+  public pendingPlayerEvents: PlayerEvent[] = [];
+
   private readonly maxFood = 400;
   private readonly baseSpeed = BASE_SPEED;
+
+  private botManager: BotManager = new BotManager();
 
   // Track inputs for each player: { id: { angle, speed } }
   private playerInputs: Map<string, { angle: number; speed: number }> = new Map();
@@ -24,6 +36,19 @@ export class GameEngine {
   constructor() {
     this.spawnInitialFood();
     this.pendingFoodEvents = [];
+    this.pendingPlayerEvents = [];
+  }
+
+  public getPlayers(): Map<string, Player> {
+    return this.players;
+  }
+
+  public getFoodGrid(): SpatialGrid<Food> {
+    return this.foodGrid;
+  }
+
+  public getPlayerInputs(): Map<string, { angle: number; speed: number }> {
+    return this.playerInputs;
   }
 
   public addPlayer(id: string, name: string): Player {
@@ -54,13 +79,18 @@ export class GameEngine {
 
     this.players.set(id, player);
     this.playerInputs.set(id, { angle: 0, speed: 0 });
+    this.pendingPlayerEvents.push({ type: "join", id, name: player.name, color });
 
     return player;
   }
 
   public removePlayer(id: string): void {
-    this.players.delete(id);
-    this.playerInputs.delete(id);
+    if (this.players.has(id)) {
+      this.players.delete(id);
+      this.playerInputs.delete(id);
+      this.botManager.getBotIds().delete(id);
+      this.pendingPlayerEvents.push({ type: "leave", id });
+    }
   }
 
   public updateInput(id: string, angle: number, speed: number): void {
@@ -73,6 +103,7 @@ export class GameEngine {
   }
 
   public tick(dt: number): void {
+    this.botManager.update(this);
     this.movePlayers(dt);
     this.checkCollisions();
     this.maintainFoodDensity();

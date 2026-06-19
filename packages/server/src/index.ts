@@ -80,11 +80,11 @@ class GameServer {
     }));
     ws.send(Buffer.from(serializeInitialFood(foods)));
 
-    ws.on("message", (rawMessage) => this.handleMessage(playerId, numericId, rawMessage));
-    ws.on("close", () => this.handleDisconnect(playerId, numericId));
+    ws.on("message", (rawMessage) => this.handleMessage(playerId, rawMessage));
+    ws.on("close", () => this.handleDisconnect(playerId));
   }
 
-  private handleMessage(playerId: string, numericId: number, rawMessage: unknown): void {
+  private handleMessage(playerId: string, rawMessage: unknown): void {
     try {
       const buffer = rawMessage as Buffer;
       const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
@@ -95,23 +95,6 @@ class GameServer {
           const name = deserializeJoin(view);
           this.gameEngine.addPlayer(playerId, name);
           console.log(`Player ${playerId} joined as: "${name}"`);
-
-          const playerObj = this.gameEngine
-            .getSerializedState()
-            .players.find((p) => p.id === playerId);
-          if (playerObj) {
-            const entry = {
-              id: numericId,
-              colorIndex: COLORS.indexOf(playerObj.color),
-              name: playerObj.name
-            };
-            const registryBuffer = Buffer.from(serializePlayerRegistry([entry]));
-            for (const clientWs of this.clients.values()) {
-              if (clientWs.readyState === WebSocket.OPEN) {
-                clientWs.send(registryBuffer);
-              }
-            }
-          }
           break;
         }
         case PACKET_TYPES.INPUT: {
@@ -126,18 +109,11 @@ class GameServer {
     }
   }
 
-  private handleDisconnect(playerId: string, numericId: number): void {
+  private handleDisconnect(playerId: string): void {
     console.log(`Client disconnected: ${playerId}`);
     this.gameEngine.removePlayer(playerId);
     this.clients.delete(playerId);
     this.lastProcessedSeq.delete(playerId);
-
-    const removeBuffer = Buffer.from(serializePlayerRemove(numericId));
-    for (const clientWs of this.clients.values()) {
-      if (clientWs.readyState === WebSocket.OPEN) {
-        clientWs.send(removeBuffer);
-      }
-    }
   }
 
   private gameLoop = (): void => {
@@ -162,7 +138,33 @@ class GameServer {
   };
 
   private broadcastState(): void {
-    // 1. Broadcast food events
+    // 1. Broadcast player events (joins/leaves)
+    const playerEvents = this.gameEngine.pendingPlayerEvents;
+    if (playerEvents.length > 0) {
+      for (const event of playerEvents) {
+        let buffer: ArrayBuffer;
+        if (event.type === "join") {
+          buffer = serializePlayerRegistry([
+            {
+              id: Number(event.id),
+              colorIndex: COLORS.indexOf(event.color || ""),
+              name: event.name || ""
+            }
+          ]);
+        } else {
+          buffer = serializePlayerRemove(Number(event.id));
+        }
+        const buf = Buffer.from(buffer);
+        for (const ws of this.clients.values()) {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(buf);
+          }
+        }
+      }
+      this.gameEngine.pendingPlayerEvents = [];
+    }
+
+    // 2. Broadcast food events
     const foodEvents = this.gameEngine.pendingFoodEvents;
     if (foodEvents.length > 0) {
       for (const event of foodEvents) {
@@ -187,7 +189,7 @@ class GameServer {
       this.gameEngine.pendingFoodEvents = [];
     }
 
-    // 2. Broadcast game ticks
+    // 3. Broadcast game ticks
     const serializedState = this.gameEngine.getSerializedState();
     const tickPlayers = serializedState.players.map((p) => ({
       id: Number(p.id),
