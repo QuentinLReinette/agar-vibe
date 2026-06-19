@@ -55,7 +55,8 @@ export class BotManager {
     // 1. Flee
     const threat = this.findClosestThreat(id, cell, engine.getPlayers());
     if (threat) {
-      const angle = Math.atan2(cell.y - threat.y, cell.x - threat.x);
+      const noise = (Math.random() - 0.5) * 0.05;
+      const angle = Math.atan2(cell.y - threat.y, cell.x - threat.x) + noise;
       engine.updateInput(id, angle, 1.0);
       return;
     }
@@ -63,7 +64,8 @@ export class BotManager {
     // 2. Hunt
     const prey = this.findClosestPrey(id, cell, engine.getPlayers());
     if (prey) {
-      const angle = Math.atan2(prey.y - cell.y, prey.x - cell.x);
+      const noise = (Math.random() - 0.5) * 0.05;
+      const angle = Math.atan2(prey.y - cell.y, prey.x - cell.x) + noise;
       engine.updateInput(id, angle, 1.0);
       return;
     }
@@ -71,7 +73,8 @@ export class BotManager {
     // 3. Feed
     const food = this.findClosestFood(cell, engine.getFoodGrid());
     if (food) {
-      const angle = Math.atan2(food.y - cell.y, food.x - cell.x);
+      const noise = (Math.random() - 0.5) * 0.1;
+      const angle = Math.atan2(food.y - cell.y, food.x - cell.x) + noise;
       engine.updateInput(id, angle, 1.0);
       return;
     }
