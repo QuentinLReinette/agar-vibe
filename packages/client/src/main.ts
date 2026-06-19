@@ -55,11 +55,16 @@ class GameClient {
   private lobby = document.getElementById("lobby")!;
   private nicknameInput = document.getElementById("nickname-input")! as HTMLInputElement;
   private playButton = document.getElementById("play-button")!;
+  private spectateButton = document.getElementById("spectate-button")!;
   private hud = document.getElementById("hud")!;
   private scoreVal = document.getElementById("score-val")!;
   private leaderboard = document.getElementById("leaderboard")!;
   private leaderboardList = document.getElementById("leaderboard-list")!;
   private leaderboardFrameCount = 0;
+  private spectateHud = document.getElementById("spectate-hud")!;
+  private spectateName = document.getElementById("spectate-name")!;
+  private exitSpectateButton = document.getElementById("exit-spectate-button")!;
+  private isSpectating = false;
 
   private lastInputSentTime = 0;
   private lastAngle = 0;
@@ -90,6 +95,8 @@ class GameClient {
     this.ws.addEventListener("close", () => this.handleClose());
 
     this.playButton.addEventListener("click", () => this.joinGame());
+    this.spectateButton.addEventListener("click", () => this.startSpectating());
+    this.exitSpectateButton.addEventListener("click", () => this.exitSpectating());
     this.nicknameInput.addEventListener("keypress", (e) => {
       if (e.key === "Enter") this.joinGame();
     });
@@ -253,10 +260,39 @@ class GameClient {
     this.inputManager.start();
   }
 
+  private startSpectating(): void {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.isSpectating = true;
+      this.isPlaying = false;
+      this.predictedX = WORLD_SIZE / 2;
+      this.predictedY = WORLD_SIZE / 2;
+      this.predictedRadius = 10;
+      this.lobby.style.opacity = "0";
+      setTimeout(() => {
+        if (this.isSpectating) {
+          this.lobby.style.display = "none";
+          this.spectateHud.style.display = "flex";
+          this.leaderboard.style.display = "block";
+        }
+      }, 300);
+    }
+  }
+
+  private exitSpectating(): void {
+    this.isSpectating = false;
+    this.spectateHud.style.display = "none";
+    this.leaderboard.style.display = "none";
+    this.lobby.style.display = "block";
+    void this.lobby.offsetHeight;
+    this.lobby.style.opacity = "1";
+  }
+
   private showLobby(): void {
     this.isPlaying = false;
+    this.isSpectating = false;
     this.inputManager.stop();
     this.hud.style.display = "none";
+    this.spectateHud.style.display = "none";
     this.leaderboard.style.display = "none";
     this.lobby.style.display = "block";
     // Trigger reflow for transition
@@ -331,7 +367,32 @@ class GameClient {
 
     const state = this.interpolation.getInterpolatedState();
     if (state) {
-      if (this.isPlaying && this.hasSpawned) {
+      if (this.isSpectating) {
+        const target = state.players.reduce(
+          (max, p) => (p.score > max.score ? p : max),
+          state.players[0]
+        );
+        if (target && target.cells[0]) {
+          const cell = target.cells[0];
+          this.predictedX += (cell.x - this.predictedX) * 0.1;
+          this.predictedY += (cell.y - this.predictedY) * 0.1;
+          this.predictedRadius += (cell.radius - this.predictedRadius) * 0.1;
+          this.spectateName.innerText = target.name;
+        } else {
+          this.spectateName.innerText = "None";
+          this.predictedX += (WORLD_SIZE / 2 - this.predictedX) * 0.1;
+          this.predictedY += (WORLD_SIZE / 2 - this.predictedY) * 0.1;
+          this.predictedRadius += (10 - this.predictedRadius) * 0.1;
+        }
+
+        this.renderer.render(
+          state,
+          this.localPlayerId,
+          this.predictedX,
+          this.predictedY,
+          this.predictedRadius
+        );
+      } else if (this.isPlaying && this.hasSpawned) {
         this.renderer.render(
           state,
           this.localPlayerId,
@@ -350,7 +411,7 @@ class GameClient {
         }
       }
 
-      if (this.isPlaying) {
+      if (this.isPlaying || this.isSpectating) {
         this.updateLeaderboard(state);
       }
     } else {

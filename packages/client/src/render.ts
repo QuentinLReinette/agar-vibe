@@ -32,12 +32,12 @@ export class CanvasRenderer {
     let camX = state.width / 2;
     let camY = state.height / 2;
 
-    const localPlayer = localPlayerId ? state.players.find((p) => p.id === localPlayerId) : null;
-    if (localPlayer && localPlayer.cells.length > 0) {
-      if (predictedX !== undefined && predictedY !== undefined) {
-        camX = predictedX;
-        camY = predictedY;
-      } else {
+    if (predictedX !== undefined && predictedY !== undefined) {
+      camX = predictedX;
+      camY = predictedY;
+    } else {
+      const localPlayer = localPlayerId ? state.players.find((p) => p.id === localPlayerId) : null;
+      if (localPlayer && localPlayer.cells.length > 0) {
         let sumX = 0;
         let sumY = 0;
         for (const cell of localPlayer.cells) {

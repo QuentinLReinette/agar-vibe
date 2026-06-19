@@ -23,7 +23,10 @@
           aria-label="Nickname"
           autofocus
         />
-        <button id="play-button">Play Game</button>
+        <div class="lobby-actions">
+          <button id="play-button">Play Game</button>
+          <button id="spectate-button" class="btn-secondary">Spectate</button>
+        </div>
       </div>
 
       <!-- Score HUD Molecule Badge -->
@@ -33,6 +36,12 @@
       <div id="leaderboard" class="leaderboard-card">
         <h3>Leaderboard</h3>
         <ol id="leaderboard-list"></ol>
+      </div>
+
+      <!-- Spectator HUD Overlay -->
+      <div id="spectate-hud" class="spectate-hud">
+        <div class="spectate-target">Spectating:<span id="spectate-name">None</span></div>
+        <button id="exit-spectate-button" class="btn-secondary">Exit Spectate</button>
       </div>
     </div>
 

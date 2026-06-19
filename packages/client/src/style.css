@@ -129,6 +129,13 @@ input[type="text"]::placeholder {
 }
 
 /* Atoms: Buttons */
+.lobby-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+  width: 100%;
+}
+
 button {
   pointer-events: auto;
   width: 100%;
@@ -148,12 +155,31 @@ button {
   transition:
     transform 0.1s var(--ease-out),
     box-shadow 0.2s var(--ease-out),
+    background 0.2s var(--ease-out),
+    border-color 0.2s var(--ease-out),
     filter 0.2s var(--ease-out);
+}
+
+button.btn-secondary {
+  background: transparent;
+  border: 1px solid hsl(var(--primary) / 0.3);
+  color: hsl(var(--foreground));
+  box-shadow: none;
+}
+
+button.btn-secondary:hover {
+  background: hsl(var(--primary) / 0.1);
+  border-color: hsla(var(--primary), 0.8);
+  box-shadow: 0 0 10px hsla(var(--primary), 0.2);
 }
 
 button:hover {
   filter: brightness(1.1);
   box-shadow: 0 0 15px hsla(var(--primary), 0.4);
+}
+
+button.btn-secondary:hover {
+  filter: none;
 }
 
 button:active {
@@ -350,6 +376,45 @@ button:focus-visible {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Molecules: Spectator element */
+.spectate-hud {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: hsla(var(--muted) / 0.85);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--border);
+  padding: 12px 24px;
+  border-radius: var(--radius-inner);
+  box-shadow: var(--shadow-md);
+  display: none; /* Controlled by JS */
+  align-items: center;
+  gap: 20px;
+  pointer-events: auto;
+  animation: slideInHUD 0.3s var(--ease-out) both;
+}
+
+.spectate-hud .spectate-target {
+  font-size: 1rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: hsl(var(--muted-foreground));
+}
+
+.spectate-hud .spectate-target span {
+  color: hsl(var(--primary));
+  margin-left: 8px;
+  text-shadow: 0 0 8px hsla(var(--primary), 0.5);
+}
+
+.spectate-hud button {
+  width: auto;
+  padding: 8px 16px;
+  font-size: 0.85rem;
 }
 
 /* Keyboard accessibility outline */
